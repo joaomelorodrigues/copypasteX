@@ -3,7 +3,8 @@
 A clean, lightweight clipboard manager for developers. copypasteX is a from-scratch Swift rewrite
 of [Flycut](https://github.com/TermiT/Flycut), built for current macOS.
 
-Copy as usual. Press **⇧⌘V** to open your clipboard history, pick a clipping and it's pasted.
+Copy text, images or files as usual. Press **⇧⌘V** to open your clipboard history, pick a
+clipping and it's pasted.
 
 ![The copypasteX bezel on macOS: clipboard history on the left, a preview of the selected clipping on the right, and the search field at the top](docs/screenshot.png)
 
@@ -11,7 +12,8 @@ Copy as usual. Press **⇧⌘V** to open your clipboard history, pick a clipping
 
 | | Flycut | copypasteX |
 |---|---|---|
-| Language | Objective-C (manual retain/release), ~13k lines plus vendored libraries | Swift 6 with strict concurrency, ~2.4k lines, no third-party dependencies |
+| Language | Objective-C (manual retain/release), ~13k lines plus vendored libraries | Swift 6 with strict concurrency, ~3k lines, no third-party dependencies |
+| Content | Text only | Text, images, and copied files (videos, photos, documents) with Quick Look previews |
 | macOS | 10.x era APIs (`LoginItemsAE`, `UKPrefsPanel`, ShortcutRecorder…) | macOS 14+, Liquid Glass on macOS 26+, `SMAppService`, SwiftUI settings |
 | Clipboard privacy (macOS 15.4+) | Not handled | Detects "Paste from Other Apps" status and walks you through it |
 | Bezel | One clipping at a time | List and full preview side by side, type to search instantly, source app icons |
@@ -52,8 +54,12 @@ change it in the target's build settings.
 ### Switching from Flycut
 
 1. In copypasteX, open **Settings ▸ History ▸ Import from Flycut…** to bring over your history and favorites.
-2. Quit Flycut and remove it from your login items. Both apps want ⇧⌘V, and macOS gives a global
-   shortcut to only one app. copypasteX shows a warning in Settings if its shortcut is taken.
+2. Quit Flycut and remove it from your login items. Both apps want ⇧⌘V, and if both run, macOS
+   triggers both on the same keypress.
+
+Updating from FlycutX, this project's earlier name? Your history and settings move over
+automatically the first time copypasteX opens. Permissions have to be granted again, because
+macOS ties them to the app's identity.
 
 ## Permissions
 
@@ -86,7 +92,7 @@ and input methods work as in any text field.
 | ⌘D | Move to favorites (or back to history) |
 | ⌘⌫ | Delete the clipping |
 | ⇥ | Switch between history and favorites |
-| ⌘S | Save the clipping to a file on the Desktop |
+| ⌘S | Save the clipping to the Desktop (text as `.txt`, images and videos in their own format) |
 | ⌘, | Settings |
 | esc | Clear the search, or close |
 
@@ -94,6 +100,20 @@ You can also click a row to select it and double-click to paste.
 
 Classic Flycut used single letters (`s`, `f`, `F`, digits) as commands. Those keys now type into the
 search, and the commands moved to ⌘ shortcuts.
+
+## Images, videos and files
+
+- **Images** copied to the clipboard, such as screenshots (⌃⇧⌘4), "Copy Image" in a browser, or
+  pictures from Preview and Photos, are kept with their size and format. They paste back as images.
+- **Files** copied in Finder, including videos, photos and documents, are kept as references.
+  Pasting puts the files themselves back, so they land in Finder, Mail or a chat app like any copied file.
+- The preview pane shows a Quick Look thumbnail: the picture, a frame of the video, or the first
+  page of a document.
+- Search finds them by file name and by kind: type `video`, `image` or `pdf`.
+- When something holds both text and a picture (Excel cells, Keynote shapes), the text is kept.
+  The exception is a browser's "Copy Image", where the text is just the image's web address, so the
+  image is kept.
+- Both kinds can be turned off in **Settings ▸ History ▸ Images and Files**.
 
 ## Menu bar
 
@@ -109,6 +129,8 @@ example while handling passwords from an app that doesn't mark them as concealed
 - Apps on the ignored list (Keychain Access, Passwords, 1Password, Bitwarden, KeePassXC by default)
   are never recorded.
 - History is stored at `~/Library/Application Support/copypasteX/history.json` with 0600 permissions.
+  Image data goes in the `Media` folder next to it, which only you can read, and is deleted when its
+  clipping is. Copied files aren't duplicated; only their location is saved.
   Turn off *Keep history after quitting* to keep history in memory only. Favorites are always saved.
 
 ## Why it's light
@@ -119,26 +141,29 @@ example while handling passwords from an app that doesn't mark them as concealed
 - **Debounced, off-main-thread saves.** A burst of copies becomes one atomic write about a second later.
 - **Nothing runs while hidden.** The menu is built when you open it, the bezel's views are created on
   first use and reused, and the Settings window is released when closed.
-- **Bounded work.** Clippings over 2 MB are skipped, previews render the first 5,000 characters, and
-  titles read only the start of each clipping.
+- **Bounded work.** Text clippings over 2 MB and images over 50 MB are skipped, previews render the
+  first 5,000 characters, and titles read only the start of each clipping.
+- **Media done cheaply.** Identical images are stored once, compressed formats are kept instead of
+  the TIFF copies apps add, a TIFF version is only produced when an app asks for one, and
+  thumbnails are made only for the clipping you're looking at.
 
 At idle, the Release build measured a 19 MB memory footprint and 0% CPU on macOS 27.
 
 ## Project layout
 
 ```
-copypasteX.xcodeproj          Xcode project (folders are synchronized, so new files are picked up automatically)
+copypasteX.xcodeproj      Xcode project (folders are synchronized, so new files are picked up automatically)
 copypasteX/
-  App/                     AppDelegate (wiring), Preferences, ClipboardStore
-  Clipboard/               PasteboardMonitor (capture), Paster (copy + ⌘V)
-  HotKey/                  Carbon global hotkey, key combos, keyboard-layout mapping
-  Bezel/                   Non-activating panel, controller (keymap), SwiftUI view
-  MenuBar/                 Status item and menu
-  Settings/                SwiftUI settings and shortcut recorder
-  Support/                 Permissions, login item, Flycut import, alerts, export
-  AppIcon.icon             Icon Composer icon (Liquid Glass; legacy icons are generated)
-Packages/CopypasteCore/       Platform-independent logic with tests: ClipList, CapturePolicy,
-                           ListCursor, HistoryFile, Flycut importer
+  App/                    AppDelegate (wiring), Preferences, ClipboardStore
+  Clipboard/              PasteboardMonitor (capture), Paster (copy + ⌘V)
+  HotKey/                 Carbon global hotkey, key combos, keyboard-layout mapping
+  Bezel/                  Non-activating panel, controller (keymap), SwiftUI view
+  MenuBar/                Status item and menu
+  Settings/               SwiftUI settings and shortcut recorder
+  Support/                Permissions, login item, Flycut import, display helpers, export, migration
+  AppIcon.icon            Icon Composer icon (Liquid Glass; legacy icons are generated)
+Packages/CopypasteCore/   Platform-independent logic with tests: Clipping, ClipList, CapturePolicy,
+                          MediaLibrary, ListCursor, HistoryFile, Flycut importer
 ```
 
 ## License

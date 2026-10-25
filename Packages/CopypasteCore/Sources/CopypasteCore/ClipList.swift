@@ -31,17 +31,17 @@ public struct ClipList: Equatable, Sendable {
 
     /// Adds `clipping` to the top of the list.
     ///
-    /// When the text is already the newest clipping nothing is added and only its date is
-    /// refreshed. With `removingDuplicates`, an older copy of the same text is removed, so it
-    /// effectively moves to the top.
+    /// When the same content is already the newest clipping nothing is added and only its date
+    /// is refreshed. With `removingDuplicates`, an older copy of the same content is removed, so
+    /// it effectively moves to the top.
     /// - Returns: `true` if a new entry was added.
     @discardableResult
     public mutating func insert(_ clipping: Clipping, removingDuplicates: Bool) -> Bool {
-        if items.first?.text == clipping.text {
+        if items.first?.content == clipping.content {
             items[0].date = clipping.date
             return false
         }
-        if removingDuplicates, let index = items.firstIndex(where: { $0.text == clipping.text }) {
+        if removingDuplicates, let index = items.firstIndex(where: { $0.content == clipping.content }) {
             items.remove(at: index)
         }
         items.insert(clipping, at: 0)
@@ -67,31 +67,38 @@ public struct ClipList: Equatable, Sendable {
         items.removeAll()
     }
 
-    /// Appends clippings whose text isn't already in the list, keeping their order, up to capacity.
+    /// Appends clippings whose content isn't already in the list, keeping their order, up to capacity.
     /// - Returns: How many were added.
     @discardableResult
     public mutating func append(contentsOf clippings: [Clipping]) -> Int {
-        var known = Set(items.map(\.text))
+        var known = Set(items.map(\.content))
         var added = 0
-        for clipping in clippings where items.count < capacity && known.insert(clipping.text).inserted {
+        for clipping in clippings where items.count < capacity && known.insert(clipping.content).inserted {
             items.append(clipping)
             added += 1
         }
         return added
     }
 
-    /// Clippings containing every whitespace-separated term of `query`, ignoring case and diacritics.
+    /// Clippings matching every whitespace-separated term of `query`, ignoring case and diacritics.
+    /// Text is matched by content; images and files by name and kind ("image", "video", …).
     public func filtered(by query: String) -> [Clipping] {
         let terms = query.split(whereSeparator: \.isWhitespace)
         guard !terms.isEmpty else { return items }
         return items.filter { clipping in
-            terms.allSatisfy { clipping.text.range(of: $0, options: [.caseInsensitive, .diacriticInsensitive]) != nil }
+            let searchable = clipping.searchableText
+            return terms.allSatisfy { searchable.range(of: $0, options: [.caseInsensitive, .diacriticInsensitive]) != nil }
         }
     }
 
-    /// All clippings joined oldest-first, the order they were copied in.
+    /// All text clippings joined oldest-first, the order they were copied in.
     public func joinedText(separator: String = "\n") -> String {
-        items.reversed().map(\.text).joined(separator: separator)
+        items.reversed().compactMap(\.text).joined(separator: separator)
+    }
+
+    /// Names of the media files the clippings refer to.
+    public var mediaFileNames: Set<String> {
+        Set(items.compactMap { $0.mediaAsset?.fileName })
     }
 
     private mutating func trim() {

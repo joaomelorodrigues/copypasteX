@@ -133,7 +133,7 @@ final class BezelController: NSObject, NSTextFieldDelegate {
         guard let clipping = model.selected else { return }
         hide()
         do {
-            _ = try ClippingExport.saveToDesktop(clipping)
+            _ = try ClippingExport.saveToDesktop(clipping, media: store.media)
         } catch {
             NSSound.beep()
         }
@@ -286,6 +286,7 @@ final class BezelController: NSObject, NSTextFieldDelegate {
         let view = BezelView(
             model: model,
             searchField: searchField,
+            media: store.media,
             onSelect: { [unowned self] in select($0) },
             onActivate: { [unowned self] in activate($0) },
             onToggleList: { [unowned self] in toggleList() }

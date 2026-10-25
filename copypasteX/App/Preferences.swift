@@ -17,6 +17,8 @@ final class Preferences {
         case removeDuplicates
         case saveHistory
         case ignoreWhitespace
+        case recordMedia
+        case recordFiles
         case ignoredApps
         case hasLaunchedBefore
     }
@@ -47,6 +49,10 @@ final class Preferences {
     var removeDuplicates: Bool { didSet { save(removeDuplicates, .removeDuplicates) } }
     var saveHistory: Bool { didSet { save(saveHistory, .saveHistory) } }
     var ignoreWhitespace: Bool { didSet { save(ignoreWhitespace, .ignoreWhitespace) } }
+    /// Record images and videos copied to the clipboard (screenshots, "Copy Image").
+    var recordMedia: Bool { didSet { save(recordMedia, .recordMedia) } }
+    /// Record files copied in Finder and elsewhere, including videos.
+    var recordFiles: Bool { didSet { save(recordFiles, .recordFiles) } }
     var ignoredApps: [String] { didSet { save(ignoredApps, .ignoredApps) } }
     var hasLaunchedBefore: Bool { didSet { save(hasLaunchedBefore, .hasLaunchedBefore) } }
 
@@ -65,6 +71,8 @@ final class Preferences {
             Key.removeDuplicates.rawValue: true,
             Key.saveHistory.rawValue: true,
             Key.ignoreWhitespace.rawValue: true,
+            Key.recordMedia.rawValue: true,
+            Key.recordFiles.rawValue: true,
             Key.ignoredApps.rawValue: Self.defaultIgnoredApps,
             Key.hasLaunchedBefore.rawValue: false,
         ])
@@ -81,6 +89,8 @@ final class Preferences {
         removeDuplicates = defaults.bool(forKey: Key.removeDuplicates.rawValue)
         saveHistory = defaults.bool(forKey: Key.saveHistory.rawValue)
         ignoreWhitespace = defaults.bool(forKey: Key.ignoreWhitespace.rawValue)
+        recordMedia = defaults.bool(forKey: Key.recordMedia.rawValue)
+        recordFiles = defaults.bool(forKey: Key.recordFiles.rawValue)
         ignoredApps = defaults.stringArray(forKey: Key.ignoredApps.rawValue) ?? Self.defaultIgnoredApps
         hasLaunchedBefore = defaults.bool(forKey: Key.hasLaunchedBefore.rawValue)
     }

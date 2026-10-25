@@ -109,6 +109,17 @@ private struct HistorySettings: View {
                 Toggle("Ignore clippings that are only whitespace", isOn: $prefs.ignoreWhitespace)
             }
 
+            Section("Images and Files") {
+                Toggle(isOn: $prefs.recordMedia) {
+                    Text("Record images")
+                    Text("Screenshots, “Copy Image” in browsers, and pictures copied in other apps. Images over 50 MB are skipped.")
+                }
+                Toggle(isOn: $prefs.recordFiles) {
+                    Text("Record copied files")
+                    Text("Videos, photos and documents copied in Finder. Only a reference is kept; pasting puts the files themselves back.")
+                }
+            }
+
             Section("Menu Bar") {
                 Stepper(value: $prefs.menuItemCount, in: 0...50) {
                     Text("Show \(prefs.menuItemCount) recent clippings in the menu")

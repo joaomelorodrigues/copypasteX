@@ -19,6 +19,8 @@ final class ClipboardStore {
 
     private(set) var history: ClipList
     private(set) var favorites: ClipList
+    /// Where copied image and video data is kept, next to the history file.
+    @ObservationIgnored let media: MediaLibrary
 
     @ObservationIgnored private let prefs: Preferences
     @ObservationIgnored private let fileURL: URL
@@ -29,6 +31,7 @@ final class ClipboardStore {
     init(prefs: Preferences, fileURL: URL = ClipboardStore.defaultFileURL) {
         self.prefs = prefs
         self.fileURL = fileURL
+        media = MediaLibrary(folder: fileURL.deletingLastPathComponent().appending(path: "Media"))
 
         var snapshot: HistorySnapshot?
         do {
@@ -38,13 +41,28 @@ final class ClipboardStore {
         }
         history = ClipList(items: prefs.saveHistory ? snapshot?.clippings ?? [] : [], capacity: prefs.historySize)
         favorites = ClipList(items: snapshot?.favorites ?? [], capacity: Self.favoritesCapacity)
+
+        // Media left over from history that wasn't kept (or a crash) is removed at launch.
+        let media = media, keep = referencedMedia
+        writer.async { Self.removeUnusedMedia(in: media, keeping: keep) }
     }
 
     subscript(kind: StoreKind) -> ClipList {
         kind == .history ? history : favorites
     }
 
-    func record(_ clipping: Clipping) {
+    /// - Parameter mediaData: The image or video data, for media clippings.
+    func record(_ clipping: Clipping, mediaData: Data? = nil) {
+        if let mediaData, let asset = clipping.mediaAsset {
+            let media = media
+            writer.async {
+                do {
+                    try media.write(mediaData, for: asset)
+                } catch {
+                    Logger(subsystem: "copypasteX", category: "store").error("Couldn't store media: \(error.localizedDescription, privacy: .public)")
+                }
+            }
+        }
         history.insert(clipping, removingDuplicates: prefs.removeDuplicates)
         scheduleSave()
     }
@@ -88,11 +106,21 @@ final class ClipboardStore {
         scheduleSave()
     }
 
-    /// Writes pending changes immediately. Call before the app quits.
+    /// Writes pending changes immediately. Call before the app quits. Media belonging to history
+    /// that isn't kept after quitting is deleted now.
     func saveNow() {
         pendingSave?.cancel()
-        let snapshot = snapshot, url = fileURL
-        writer.sync { Self.write(snapshot, to: url) }
+        let snapshot = snapshot, url = fileURL, media = media
+        let keep = Set((snapshot.clippings + snapshot.favorites).compactMap { $0.mediaAsset?.fileName })
+        writer.sync {
+            Self.write(snapshot, to: url)
+            Self.removeUnusedMedia(in: media, keeping: keep)
+        }
+    }
+
+    /// Media for the media clippings still in memory, saved or not.
+    private var referencedMedia: Set<String> {
+        history.mediaFileNames.union(favorites.mediaFileNames)
     }
 
     private func modify(_ kind: StoreKind, _ change: (inout ClipList) -> Void) {
@@ -117,8 +145,19 @@ final class ClipboardStore {
                 return
             }
             guard let self else { return }
-            let snapshot = snapshot, url = fileURL
-            writer.async { Self.write(snapshot, to: url) }
+            let snapshot = snapshot, url = fileURL, media = media, keep = referencedMedia
+            writer.async {
+                Self.write(snapshot, to: url)
+                Self.removeUnusedMedia(in: media, keeping: keep)
+            }
+        }
+    }
+
+    private nonisolated static func removeUnusedMedia(in media: MediaLibrary, keeping keep: Set<String>) {
+        do {
+            try media.removeFiles(notIn: keep)
+        } catch {
+            Logger(subsystem: "copypasteX", category: "store").error("Couldn't clean up media: \(error.localizedDescription, privacy: .public)")
         }
     }
 

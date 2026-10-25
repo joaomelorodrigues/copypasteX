@@ -10,6 +10,7 @@ struct BezelView: View {
 
     let model: BezelModel
     let searchField: NSTextField
+    let media: MediaLibrary
     var onSelect: (Int) -> Void
     var onActivate: (Int) -> Void
     var onToggleList: () -> Void
@@ -26,7 +27,7 @@ struct BezelView: View {
                     ClippingList(model: model, onSelect: onSelect, onActivate: onActivate)
                         .frame(width: 300)
                     Divider()
-                    ClippingPreview(clipping: model.selected, showSourceApp: model.showSourceApp)
+                    ClippingPreview(clipping: model.selected, media: media, showSourceApp: model.showSourceApp)
                 }
             }
             Divider()
@@ -44,7 +45,7 @@ struct BezelView: View {
         } else if model.kind == .favorites {
             EmptyState(title: "No Favorites Yet", symbol: "star", message: "Press ⌘D on a clipping to keep it here for good.")
         } else {
-            EmptyState(title: "Nothing Copied Yet", symbol: "list.clipboard", message: "Copy some text and it will show up here.")
+            EmptyState(title: "Nothing Copied Yet", symbol: "list.clipboard", message: "Copy text, images or files and they'll show up here.")
         }
     }
 }
@@ -184,9 +185,14 @@ private struct ClippingRow: View {
             if showSourceApp {
                 AppIcon(bundleID: clipping.sourceBundleID, size: 16)
             }
+            if let symbol = clipping.kindSymbol {
+                Image(systemName: symbol)
+                    .font(.caption)
+                    .foregroundStyle(isSelected ? AnyShapeStyle(.white.opacity(0.85)) : AnyShapeStyle(.secondary))
+            }
             Text(clipping.title(maxLength: 90))
                 .lineLimit(1)
-                .truncationMode(.tail)
+                .truncationMode(.middle)
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 8)
@@ -202,17 +208,30 @@ private struct ClippingPreview: View {
     private static let maxPreviewLength = 5_000
 
     let clipping: Clipping?
+    let media: MediaLibrary
     let showSourceApp: Bool
 
     var body: some View {
         if let clipping {
             VStack(alignment: .leading, spacing: 0) {
-                ScrollView {
-                    Text(previewText(clipping))
-                        .font(.system(size: 12, design: .monospaced))
-                        .frame(maxWidth: .infinity, alignment: .topLeading)
-                        .padding(14)
+                Group {
+                    switch clipping.content {
+                    case .text(let text):
+                        ScrollView {
+                            Text(previewText(text))
+                                .font(.system(size: 12, design: .monospaced))
+                                .frame(maxWidth: .infinity, alignment: .topLeading)
+                                .padding(14)
+                        }
+                    case .media(let asset):
+                        ThumbnailPreview(url: media.url(for: asset), isVideo: asset.isVideo, caption: nil)
+                    case .files(let urls) where urls.count == 1:
+                        ThumbnailPreview(url: urls[0], isVideo: clipping.kindSymbol == "film", caption: urls[0].lastPathComponent)
+                    case .files(let urls):
+                        FileList(urls: urls)
+                    }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .id(clipping.id)
                 Divider()
                 HStack(spacing: 6) {
@@ -225,7 +244,7 @@ private struct ClippingPreview: View {
                     }
                     Text(clipping.date, format: .relative(presentation: .named))
                     Spacer()
-                    Text(stats(clipping))
+                    Text(clipping.details)
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -238,16 +257,92 @@ private struct ClippingPreview: View {
         }
     }
 
-    private func previewText(_ clipping: Clipping) -> String {
-        let head = clipping.text.prefix(Self.maxPreviewLength)
-        return head.endIndex == clipping.text.endIndex ? clipping.text : String(head) + "\n…"
+    private func previewText(_ text: String) -> String {
+        let head = text.prefix(Self.maxPreviewLength)
+        return head.endIndex == text.endIndex ? text : String(head) + "\n…"
     }
+}
 
-    private func stats(_ clipping: Clipping) -> String {
-        let characters = clipping.text.count
-        let lines = clipping.lineCount
-        return "\(characters.formatted()) character\(characters == 1 ? "" : "s")"
-            + (lines > 1 ? " · \(lines.formatted()) lines" : "")
+/// A Quick Look thumbnail sized to the preview pane. Generated off the main thread and only
+/// for the selected clipping.
+private struct ThumbnailPreview: View {
+    let url: URL
+    let isVideo: Bool
+    let caption: String?
+
+    @State private var thumbnail: NSImage?
+    @State private var isMissing = false
+    @Environment(\.displayScale) private var displayScale
+
+    var body: some View {
+        VStack(spacing: 10) {
+            ZStack {
+                if let thumbnail {
+                    Image(nsImage: thumbnail)
+                        .resizable()
+                        .scaledToFit()
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .shadow(color: .black.opacity(0.2), radius: 6, y: 2)
+                    if isVideo {
+                        Image(systemName: "play.circle.fill")
+                            .font(.system(size: 44))
+                            .symbolRenderingMode(.palette)
+                            .foregroundStyle(.white, .black.opacity(0.45))
+                    }
+                } else if isMissing {
+                    Label("This file no longer exists", systemImage: "questionmark.folder")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ProgressView().controlSize(.small)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            if let caption {
+                Text(caption)
+                    .font(.callout)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+        }
+        .padding(18)
+        .task(id: url) {
+            guard FileManager.default.fileExists(atPath: url.path) else {
+                isMissing = true
+                return
+            }
+            thumbnail = await Thumbnails.image(for: url, size: CGSize(width: 380, height: 280), scale: displayScale)
+            isMissing = thumbnail == nil
+        }
+    }
+}
+
+/// Several copied files, listed with their Finder icons.
+private struct FileList: View {
+    private static let maxShown = 50
+
+    let urls: [URL]
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(urls.prefix(Self.maxShown), id: \.self) { url in
+                    HStack(spacing: 8) {
+                        Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
+                            .resizable()
+                            .frame(width: 20, height: 20)
+                        Text(url.lastPathComponent)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                }
+                if urls.count > Self.maxShown {
+                    Text("and \(urls.count - Self.maxShown) more")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+        }
     }
 }
 

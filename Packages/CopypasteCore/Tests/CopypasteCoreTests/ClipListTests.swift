@@ -3,7 +3,7 @@ import Testing
 @testable import CopypasteCore
 
 @Suite struct ClipListTests {
-    private func texts(_ list: ClipList) -> [String] { list.items.map(\.text) }
+    private func texts(_ list: ClipList) -> [String] { list.items.compactMap(\.text) }
 
     @Test func insertsNewestFirst() {
         var list = ClipList(capacity: 10)

@@ -81,8 +81,8 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         pause.state = monitor.isPaused ? .on : .off
         menu.addItem(pause)
         let merge = item("Merge All Clippings", #selector(mergeAll))
-        merge.toolTip = "Combine all clippings, oldest first, into one new clipping on the clipboard."
-        merge.isEnabled = store.history.count > 1
+        merge.toolTip = "Combine all text clippings, oldest first, into one new clipping on the clipboard."
+        merge.isEnabled = store.history.items.lazy.filter { $0.text != nil }.prefix(2).count > 1
         menu.addItem(merge)
         let clear = item("Clear History…", #selector(clearHistory))
         clear.isEnabled = !store.history.isEmpty
@@ -110,7 +110,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     @objc private func mergeAll() {
         let merged = Clipping(text: store.history.joinedText())
         store.record(merged)
-        paster.copy(merged.text)
+        paster.copy(merged.content)
     }
 
     @objc private func clearHistory() {
@@ -130,8 +130,10 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         let item = item(clipping.title(maxLength: prefs.menuItemLength), #selector(clippingChosen(_:)))
         item.representedObject = clipping.id
         item.tag = kind == .favorites ? 1 : 0
-        item.toolTip = String(clipping.text.prefix(600))
-        if prefs.showSourceApp, let bundleID = clipping.sourceBundleID, let icon = AppInfo.icon(for: bundleID) {
+        item.toolTip = clipping.summary
+        if let symbol = clipping.kindSymbol {
+            item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
+        } else if prefs.showSourceApp, let bundleID = clipping.sourceBundleID, let icon = AppInfo.icon(for: bundleID) {
             let image = icon.copy() as? NSImage
             image?.size = NSSize(width: 16, height: 16)
             item.image = image

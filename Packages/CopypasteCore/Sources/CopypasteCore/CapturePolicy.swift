@@ -19,12 +19,26 @@ public struct CapturePolicy: Sendable {
     /// Clippings larger than this (in UTF-8 bytes) are skipped to keep memory use predictable.
     public static let maxBytes = 2 * 1024 * 1024
 
+    /// Images and videos larger than this are skipped, so the history can't fill the disk.
+    public static let maxMediaBytes = 50 * 1024 * 1024
+
     public var ignoredBundleIDs: Set<String>
     public var ignoresWhitespaceOnly: Bool
+    /// Record image and video data copied to the clipboard.
+    public var capturesMedia: Bool
+    /// Record files copied in Finder and elsewhere.
+    public var capturesFiles: Bool
 
-    public init(ignoredBundleIDs: Set<String> = [], ignoresWhitespaceOnly: Bool = true) {
+    public init(
+        ignoredBundleIDs: Set<String> = [],
+        ignoresWhitespaceOnly: Bool = true,
+        capturesMedia: Bool = true,
+        capturesFiles: Bool = true
+    ) {
         self.ignoredBundleIDs = ignoredBundleIDs
         self.ignoresWhitespaceOnly = ignoresWhitespaceOnly
+        self.capturesMedia = capturesMedia
+        self.capturesFiles = capturesFiles
     }
 
     /// Checked before reading any content, so private data is never even loaded.
@@ -43,5 +57,18 @@ public struct CapturePolicy: Sendable {
             return false
         }
         return true
+    }
+
+    public func acceptsMedia(byteCount: Int) -> Bool {
+        capturesMedia && byteCount > 0 && byteCount <= Self.maxMediaBytes
+    }
+
+    /// When the clipboard holds both text and an image, the text usually matters more: Excel,
+    /// Word and Keynote add a picture of whatever was copied. "Copy Image" in a browser is the
+    /// exception, adding the image's address as text, so a lone web address gives way to the image.
+    public static func prefersImage(overText text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return (trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://"))
+            && !trimmed.contains(where: \.isWhitespace)
     }
 }

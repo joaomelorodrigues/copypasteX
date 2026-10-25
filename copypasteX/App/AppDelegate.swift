@@ -27,9 +27,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.mainMenu = makeMainMenu()
 
         monitor.policy = { [prefs] in
-            CapturePolicy(ignoredBundleIDs: Set(prefs.ignoredApps), ignoresWhitespaceOnly: prefs.ignoreWhitespace)
+            CapturePolicy(
+                ignoredBundleIDs: Set(prefs.ignoredApps),
+                ignoresWhitespaceOnly: prefs.ignoreWhitespace,
+                capturesMedia: prefs.recordMedia,
+                capturesFiles: prefs.recordFiles
+            )
         }
-        monitor.onCapture = { [store] in store.record($0) }
+        monitor.onCapture = { [store] clipping, mediaData in store.record(clipping, mediaData: mediaData) }
         monitor.start()
 
         bezel.openSettings = { [settings] in settings.show() }
