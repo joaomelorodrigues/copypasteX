@@ -24,14 +24,15 @@ final class Paster {
             NSSound.beep()
             return
         }
-        switch kind {
-        case .history where prefs.moveToTopOnPaste:
-            store.moveToTop(clipping.id, in: .history)
-        case .favorites:
-            // A favorite on the clipboard is now the most recent clipping too.
-            store.record(Clipping(content: clipping.content, sourceAppName: clipping.sourceAppName, sourceBundleID: clipping.sourceBundleID))
-        default:
-            break
+        // With the setting off, using a clipping leaves the history in the order things were copied.
+        if prefs.moveToTopOnPaste {
+            switch kind {
+            case .history:
+                store.moveToTop(clipping.id, in: .history)
+            case .favorites:
+                // A favorite on the clipboard is now the most recent clipping too.
+                store.record(Clipping(content: clipping.content, sourceAppName: clipping.sourceAppName, sourceBundleID: clipping.sourceBundleID))
+            }
         }
         guard paste else { return }
         Task {

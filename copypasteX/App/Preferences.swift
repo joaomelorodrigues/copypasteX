@@ -67,7 +67,7 @@ final class Preferences {
             Key.wrapAround.rawValue: false,
             Key.showSourceApp.rawValue: true,
             Key.pasteOnSelect.rawValue: true,
-            Key.moveToTopOnPaste.rawValue: true,
+            Key.moveToTopOnPaste.rawValue: false,
             Key.removeDuplicates.rawValue: true,
             Key.saveHistory.rawValue: true,
             Key.ignoreWhitespace.rawValue: true,

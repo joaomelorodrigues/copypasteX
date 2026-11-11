@@ -81,7 +81,10 @@ private struct GeneralSettings: View {
                     Text("Paste after choosing a clipping")
                     Text("When off, the clipping is only copied to the clipboard.")
                 }
-                Toggle("Move used clippings to the top", isOn: $prefs.moveToTopOnPaste)
+                Toggle(isOn: $prefs.moveToTopOnPaste) {
+                    Text("Move used clippings to the top")
+                    Text("When off, the history keeps the order things were copied in.")
+                }
             }
         }
         .formStyle(.grouped)
