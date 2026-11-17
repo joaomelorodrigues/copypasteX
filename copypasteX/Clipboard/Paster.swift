@@ -38,10 +38,34 @@ final class Paster {
         Task {
             // Give the target app a moment to get keyboard focus back from the bezel or menu.
             try? await Task.sleep(for: .milliseconds(60))
-            if !Self.sendPasteKeystroke() && !didPromptForAccessibility {
-                didPromptForAccessibility = true
-                Permissions.requestAccessibility()
+            if !Self.sendPasteKeystroke() {
+                explainMissingAccessibility()
             }
+        }
+    }
+
+    /// Without Accessibility access the bezel just closes and nothing is pasted, which looks like a
+    /// bug. Say why the first time; after that a beep is enough.
+    private func explainMissingAccessibility() {
+        NSSound.beep()
+        guard !didPromptForAccessibility else { return }
+        didPromptForAccessibility = true
+        let openSettings = Alerts.confirm(
+            "copypasteX can't paste for you",
+            """
+            The clipping is on the clipboard, so ⌘V pastes it. To paste automatically, copypasteX \
+            needs Accessibility access in Privacy & Security.
+
+            If copypasteX is already turned on there, remove it with − and add it again: macOS \
+            drops the permission when a new version of the app is installed.
+            """,
+            action: "Open Accessibility Settings",
+            cancel: "Not Now"
+        )
+        if openSettings {
+            // Adds copypasteX to the list, so there's a switch to turn on.
+            Permissions.requestAccessibility()
+            Permissions.openAccessibilitySettings()
         }
     }
 
