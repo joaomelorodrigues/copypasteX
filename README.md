@@ -72,9 +72,9 @@ the selected clipping into the app you were using.
 | Type | Search clippings, file names and kinds (`video`, `image`, `pdf`) |
 | ↓ / ↑ | Next / previous clipping (or press the shortcut again) |
 | ⌘↓ / ⌘↑, Home / End, Page Up / Page Down | Last / first, ±10 |
-| ↩ | Paste the clipping (or copy it, if *Paste after choosing* is off) |
+| ↩ or Enter | Paste the clipping (or copy it, if *Paste after choosing* is off) |
 | ⌘1 – ⌘9, ⌘0 | Paste clipping 1–10 straight away |
-| ⌘C or keypad Enter | Copy without pasting |
+| ⌘C | Copy without pasting |
 | ⌘D | Move to favorites (or back to history) |
 | ⌘⌫ | Delete the clipping |
 | ⇥ | Switch between history and favorites |

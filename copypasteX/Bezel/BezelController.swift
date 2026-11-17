@@ -195,8 +195,8 @@ final class BezelController: NSObject, NSTextFieldDelegate {
         case kVK_PageUp: model.cursor.jump(-10)
         case kVK_Home: model.cursor.moveToStart()
         case kVK_End: model.cursor.moveToEnd()
-        case kVK_Return: commit(.paste)
-        case kVK_ANSI_KeypadEnter: commit(.copy)
+        // The main Return key and the keypad's Enter (also fn-Return on laptops) both paste.
+        case kVK_Return, kVK_ANSI_KeypadEnter: commit(.paste)
         case kVK_Tab: toggleList()
         case kVK_Escape: model.query.isEmpty ? hide() : setQuery("")
         default:
